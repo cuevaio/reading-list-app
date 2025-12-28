@@ -103,6 +103,27 @@ export type Database = {
           url: string
         }[]
       }
+      search_readings_by_embedding: {
+        Args: {
+          filter_user_id?: string
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          content: string
+          created_at: string
+          favicon: string
+          id: string
+          is_read: boolean
+          og_image: string
+          similarity: number
+          summary: string
+          title: string
+          updated_at: string
+          url: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
