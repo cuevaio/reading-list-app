@@ -74,7 +74,7 @@ export function ReadingCard({ reading, onUpdate, showSimilarity = false }: Readi
 
   return (
     <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-card/50 backdrop-blur-sm border-border/50">
-      <a href={`/${reading.url}`} target="_blank" rel="noopener noreferrer" className="flex flex-col h-full">
+      <a href={reading.url} target="_blank" rel="noopener noreferrer" className="flex flex-col h-full">
         <div className="relative h-48 w-full overflow-hidden bg-muted/50">
           {reading.og_image ? (
             <div className="relative h-full w-full overflow-hidden">
