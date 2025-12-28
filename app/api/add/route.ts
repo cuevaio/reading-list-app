@@ -98,13 +98,13 @@ export async function POST(request: Request) {
 		});
 
 		/*
-    // Generate embeddings for semantic search using the summary and title
-    const textToEmbed = `${title}\n\n${summary}`
-    const { embedding } = await embed({
-      model: "openai/text-embedding-3-small",
-      value: textToEmbed,
-    })
-    */
+	// Generate embeddings for semantic search using the summary and title
+	const textToEmbed = `${title}\n\n${summary}`
+	const { embedding } = await embed({
+	  model: "openai/text-embedding-3-small",
+	  value: textToEmbed,
+	})
+	*/
 
 		// Insert into database
 		const { data, error: insertError } = await supabase
@@ -144,6 +144,97 @@ export async function POST(request: Request) {
 		});
 	} catch (error) {
 		console.error("Add article error:", error);
+		return NextResponse.json(
+			{ error: "Internal server error" },
+			{ status: 500 },
+		);
+	}
+}
+
+export async function GET(request: Request) {
+	try {
+		const supabase = await createClient();
+
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+
+		if (!user) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const { searchParams } = new URL(request.url);
+		const url = searchParams.get("url");
+
+		if (!url) {
+			return NextResponse.json({ error: "URL is required" }, { status: 400 });
+		}
+
+		// 1️⃣ Buscar primero en BD
+		const { data: existingReading } = await supabase
+			.from("readings")
+			.select("*")
+			.eq("user_id", user.id)
+			.eq("url", url)
+			.single();
+
+		if (existingReading) {
+			return NextResponse.json({
+				success: true,
+				source: "database",
+				data: existingReading,
+			});
+		}
+
+		// 2️⃣ NO existe → scrape en caliente
+		const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+		if (!firecrawlApiKey) {
+			return NextResponse.json(
+				{ error: "Firecrawl API key not configured" },
+				{ status: 500 },
+			);
+		}
+
+		const scrapeResponse = await fetch("https://api.firecrawl.dev/v1/scrape", {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${firecrawlApiKey}`,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				url,
+				formats: ["markdown", "html"],
+			}),
+		});
+
+		if (!scrapeResponse.ok) {
+			return NextResponse.json(
+				{ error: "Failed to scrape URL" },
+				{ status: 500 },
+			);
+		}
+
+		const scrapeData = await scrapeResponse.json();
+		const markdown = scrapeData.data?.markdown || "";
+		const metadata = scrapeData.data?.metadata || {};
+
+		const title = metadata.title || "Untitled";
+		const ogImage = metadata.ogImage || null;
+		const favicon = metadata.favicon || null;
+
+		return NextResponse.json({
+			success: true,
+			source: "scrape",
+			data: {
+				url,
+				title,
+				ogImage,
+				favicon,
+				content: markdown,
+			},
+		});
+	} catch (error) {
+		console.error("GET scrape error:", error);
 		return NextResponse.json(
 			{ error: "Internal server error" },
 			{ status: 500 },
