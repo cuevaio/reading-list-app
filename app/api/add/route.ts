@@ -1,4 +1,5 @@
 import { generateText } from 'ai'
+import { revalidatePath } from 'next/cache'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
@@ -9,7 +10,7 @@ export async function POST(request: Request) {
     // Get authenticated user
     const {
       data: { user },
-      error: authError
+      error: authError,
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            'Firecrawl API key not configured. Please add FIRECRAWL_API_KEY to your environment variables.'
+            'Firecrawl API key not configured. Please add FIRECRAWL_API_KEY to your environment variables.',
         },
         { status: 500 }
       )
@@ -62,12 +63,12 @@ export async function POST(request: Request) {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${firecrawlApiKey}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         url,
-        formats: ['markdown', 'html']
-      })
+        formats: ['markdown', 'html'],
+      }),
     })
 
     if (!scrapeResponse.ok) {
@@ -94,17 +95,10 @@ export async function POST(request: Request) {
         0,
         3000
       )}`,
-      maxOutputTokens: 280
+      maxOutputTokens: 280,
     })
 
-    /*
-    // Generate embeddings for semantic search using the summary and title
-    const textToEmbed = `${title}\n\n${summary}`
-    const { embedding } = await embed({
-      model: "openai/text-embedding-3-small",
-      value: textToEmbed,
-    })
-    */
+
 
     // Insert into database
     const { data, error: insertError } = await supabase
@@ -118,7 +112,7 @@ export async function POST(request: Request) {
         summary: summary.slice(0, 280),
         content: markdown,
         embedding: undefined,
-        is_read: false
+        is_read: false,
       })
       .select()
       .single()
@@ -131,6 +125,9 @@ export async function POST(request: Request) {
       )
     }
 
+    // Revalidate the dashboard page to show the new article
+    revalidatePath('/dashboard')
+
     return NextResponse.json({
       success: true,
       data: {
@@ -139,8 +136,8 @@ export async function POST(request: Request) {
         title: data.title,
         ogImage: data.og_image,
         favicon: data.favicon,
-        summary: data.summary
-      }
+        summary: data.summary,
+      },
     })
   } catch (error) {
     console.error('Add article error:', error)
@@ -149,4 +146,95 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
+}
+
+export async function GET(request: Request) {
+	try {
+		const supabase = await createClient();
+
+		const {
+			data: { user },
+		} = await supabase.auth.getUser();
+
+		if (!user) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
+
+		const { searchParams } = new URL(request.url);
+		const url = searchParams.get("url");
+
+		if (!url) {
+			return NextResponse.json({ error: "URL is required" }, { status: 400 });
+		}
+
+		// 1️⃣ Buscar primero en BD
+		const { data: existingReading } = await supabase
+			.from("readings")
+			.select("*")
+			.eq("user_id", user.id)
+			.eq("url", url)
+			.single();
+
+		if (existingReading) {
+			return NextResponse.json({
+				success: true,
+				source: "database",
+				data: existingReading,
+			});
+		}
+
+		// 2️⃣ NO existe → scrape en caliente
+		const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+		if (!firecrawlApiKey) {
+			return NextResponse.json(
+				{ error: "Firecrawl API key not configured" },
+				{ status: 500 },
+			);
+		}
+
+		const scrapeResponse = await fetch("https://api.firecrawl.dev/v1/scrape", {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${firecrawlApiKey}`,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				url,
+				formats: ["markdown", "html"],
+			}),
+		});
+
+		if (!scrapeResponse.ok) {
+			return NextResponse.json(
+				{ error: "Failed to scrape URL" },
+				{ status: 500 },
+			);
+		}
+
+		const scrapeData = await scrapeResponse.json();
+		const markdown = scrapeData.data?.markdown || "";
+		const metadata = scrapeData.data?.metadata || {};
+
+		const title = metadata.title || "Untitled";
+		const ogImage = metadata.ogImage || null;
+		const favicon = metadata.favicon || null;
+
+		return NextResponse.json({
+			success: true,
+			source: "scrape",
+			data: {
+				url,
+				title,
+				ogImage,
+				favicon,
+				content: markdown,
+			},
+		});
+	} catch (error) {
+		console.error("GET scrape error:", error);
+		return NextResponse.json(
+			{ error: "Internal server error" },
+			{ status: 500 },
+		);
+	}
 }
