@@ -1,97 +1,94 @@
-"use client";
+'use client'
 
-import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 type ReadingData = {
-    title: string;
-    content: string;
-    ogImage?: string | null;
-    favicon?: string | null;
-};
+  title: string
+  content: string
+  ogImage?: string | null
+  favicon?: string | null
+}
 
-export default function ReadPage() {
-    const searchParams = useSearchParams();
-    const url = searchParams.get("url");
+function ReadPageContent() {
+  const searchParams = useSearchParams()
+  const url = searchParams.get('url')
 
-    const [data, setData] = useState<ReadingData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<ReadingData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-    useEffect(() => {
-        if (!url) {
-            setError("URL no proporcionada");
-            setLoading(false);
-            return;
-        }
-
-        fetch(`/api/add?url=${encodeURIComponent(url)}`)
-            .then(async (res) => {
-                const json = await res.json();
-                if (!res.ok) throw new Error(json.error || "Error al cargar");
-                return json;
-            })
-            .then((result) => setData(result.data))
-            .catch((err) => setError(err.message))
-            .finally(() => setLoading(false));
-    }, [url]);
-
-    /* ---------- STATES ---------- */
-
-    if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center text-gray-400">
-                Cargando contenido…
-            </div>
-        );
+  useEffect(() => {
+    if (!url) {
+      setError('URL no proporcionada')
+      setLoading(false)
+      return
     }
 
-    if (error) {
-        return (
-            <div className="min-h-screen flex items-center justify-center text-red-500">
-                {error}
-            </div>
-        );
-    }
+    fetch(`/api/add?url=${encodeURIComponent(url)}`)
+      .then(async (res) => {
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Error al cargar')
+        return json
+      })
+      .then((result) => setData(result.data))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [url])
 
-    if (!data) return null;
+  /* ---------- STATES ---------- */
 
-    /* ---------- UI ---------- */
-
+  if (loading) {
     return (
-        <main className="min-h-screen bg-neutral-100">
-            {/* HEADER */}
-            <header className="border-b bg-white">
-                <div className="max-w-3xl mx-auto px-6 py-10">
-                    <h1 className="text-3xl md:text-4xl font-semibold leading-tight">
-                        {data.title}
-                    </h1>
+      <div className="min-h-screen flex items-center justify-center text-gray-400">
+        Cargando contenido…
+      </div>
+    )
+  }
 
-                    {url && (
-                        <p className="mt-3 text-sm text-gray-400 truncate">
-                            {url}
-                        </p>
-                    )}
-                </div>
-            </header>
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-red-500">
+        {error}
+      </div>
+    )
+  }
 
-            {/* HERO IMAGE */}
-            {data.ogImage && (
-                <div className="max-w-3xl mx-auto px-6 mt-8">
-                    <img
-                        src={data.ogImage}
-                        alt="Cover"
-                        className="w-full rounded-2xl shadow-md"
-                    />
-                </div>
-            )}
+  if (!data) return null
 
-            {/* CONTENT */}
-            <section className="max-w-3xl mx-auto px-6 py-14">
-                <article
-                    className="
+  /* ---------- UI ---------- */
+
+  return (
+    <main className="min-h-screen bg-neutral-100">
+      {/* HEADER */}
+      <header className="border-b bg-white">
+        <div className="max-w-3xl mx-auto px-6 py-10">
+          <h1 className="text-3xl md:text-4xl font-semibold leading-tight">
+            {data.title}
+          </h1>
+
+          {url && <p className="mt-3 text-sm text-gray-400 truncate">{url}</p>}
+        </div>
+      </header>
+
+      {/* HERO IMAGE */}
+      {data.ogImage && (
+        <div className="max-w-3xl mx-auto px-6 mt-8">
+          <img
+            src={data.ogImage}
+            alt="Cover"
+            className="w-full rounded-2xl shadow-md"
+          />
+        </div>
+      )}
+
+      {/* CONTENT */}
+      <section className="max-w-3xl mx-auto px-6 py-14">
+        <article
+          className="
             prose prose-neutral prose-lg max-w-none
             prose-headings:font-semibold
             prose-headings:tracking-tight
@@ -101,16 +98,30 @@ export default function ReadPage() {
             prose-a:text-blue-600
             prose-a:no-underline hover:prose-a:underline
           "
-                >
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {data.content}
-                    </ReactMarkdown>
-                </article>
+        >
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {data.content}
+          </ReactMarkdown>
+        </article>
 
-                <footer className="mt-16 text-center text-xs text-gray-400">
-                    Contenido obtenido automáticamente desde la URL proporcionada
-                </footer>
-            </section>
-        </main>
-    );
+        <footer className="mt-16 text-center text-xs text-gray-400">
+          Contenido obtenido automáticamente desde la URL proporcionada
+        </footer>
+      </section>
+    </main>
+  )
+}
+
+export default function ReadPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-gray-400">
+          Cargando contenido…
+        </div>
+      }
+    >
+      <ReadPageContent />
+    </Suspense>
+  )
 }
