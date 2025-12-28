@@ -45,34 +45,34 @@ export function AddArticleForm() {
   }
 
   return (
-    <Card className="p-6">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="flex gap-2">
+    <div className="w-full">
+      <form onSubmit={handleSubmit} className="relative group">
+        <div className="relative flex items-center">
+          <div className="absolute left-3 text-muted-foreground">
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          </div>
           <Input
             type="url"
-            placeholder="Paste article URL here... (e.g., https://example.com/article)"
+            placeholder="Paste article URL to save..."
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             required
-            className="flex-1"
+            className="pl-10 h-10 bg-background/50 border-transparent focus:border-primary/20 hover:bg-background/80 transition-all rounded-xl shadow-none focus:ring-0 text-base"
             disabled={isLoading}
           />
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Adding...
-              </>
-            ) : (
-              <>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Article
-              </>
-            )}
-          </Button>
+          <div className="absolute right-1.5">
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isLoading || !url}
+              className={`h-8 px-4 rounded-lg transition-all duration-300 ${url ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'}`}
+            >
+              Add
+            </Button>
+          </div>
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-sm text-destructive mt-2 px-1">{error}</p>}
       </form>
-    </Card>
+    </div>
   )
 }
