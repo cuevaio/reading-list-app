@@ -6,19 +6,22 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
-import { Plus, Loader2 } from "lucide-react"
+import { Plus, Loader2, Link, Check } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { motion, AnimatePresence } from "motion/react"
 
 export function AddArticleForm() {
   const [url, setUrl] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isSuccess, setIsSuccess] = useState(false)
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
+    setIsSuccess(false)
 
     try {
       const response = await fetch("/api/add", {
@@ -36,7 +39,11 @@ export function AddArticleForm() {
       }
 
       setUrl("")
+      setIsSuccess(true)
       router.refresh()
+
+      // Reset success state after animation
+      setTimeout(() => setIsSuccess(false), 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add article")
     } finally {
@@ -46,33 +53,70 @@ export function AddArticleForm() {
 
   return (
     <div className="w-full">
-      <form onSubmit={handleSubmit} className="relative group">
+      <motion.form
+        onSubmit={handleSubmit}
+        className="relative group"
+        animate={error ? { x: [-10, 10, -10, 10, 0] } : {}}
+        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+        onAnimationComplete={() => {
+          if (error) setTimeout(() => setError(null), 3000)
+        }}
+      >
         <div className="relative flex items-center">
-          <div className="absolute left-3 text-muted-foreground">
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          <div className="absolute left-3 text-muted-foreground z-10">
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> :
+              isSuccess ? <Check className="h-4 w-4 text-green-500" /> :
+                <Link className="h-4 w-4" />}
           </div>
           <Input
             type="url"
             placeholder="Paste article URL to save..."
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => {
+              setUrl(e.target.value)
+              if (error) setError(null)
+            }}
             required
-            className="pl-10 h-10 bg-background/50 border-transparent focus:border-primary/20 hover:bg-background/80 transition-all rounded-xl shadow-none focus:ring-0 text-base"
+            className={`pl-10 h-12 bg-background/50 border-input/50 focus:border-primary/20 hover:bg-background/80 transition-all rounded-full shadow-sm focus:ring-2 focus:ring-primary/10 text-base ${error ? 'border-destructive/50 ring-destructive/10' : ''}`}
             disabled={isLoading}
           />
-          <div className="absolute right-1.5">
-            <Button
-              type="submit"
-              size="sm"
-              disabled={isLoading || !url}
-              className={`h-8 px-4 rounded-lg transition-all duration-300 ${url ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'}`}
-            >
-              Add
-            </Button>
+
+          <div className="absolute right-1.5 flex items-center">
+            <AnimatePresence>
+              {url && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20, scale: 0.8 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 20, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Button
+                    type="submit"
+                    size="icon"
+                    disabled={isLoading}
+                    className="h-9 w-9 rounded-full shadow-md bg-primary hover:bg-primary/90 text-primary-foreground"
+                  >
+                    <Plus className="h-5 w-5" />
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
+
         </div>
-        {error && <p className="text-sm text-destructive mt-2 px-1">{error}</p>}
-      </form>
+        <AnimatePresence>
+          {error && (
+            <motion.p
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="text-sm text-destructive mt-2 px-4 font-medium"
+            >
+              {error}
+            </motion.p>
+          )}
+        </AnimatePresence>
+      </motion.form>
     </div>
   )
 }
